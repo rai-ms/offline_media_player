@@ -21,7 +21,7 @@ class OfflineMediaPlayerPlugin: NSObject, FlutterPlugin {
     private var playbackSink: FlutterEventSink?
 
     static func register(with registrar: FlutterPluginRegistrar) {
-        let instance = OfflineHlsPlugin()
+        let instance = OfflineMediaPlayerPlugin()
 
         // Method channel
         let methodChannel = FlutterMethodChannel(
