@@ -376,23 +376,13 @@ class OfflineHlsDownloadManager(
             Log.d(TAG, "   AuthHeadersJson: ${authHeadersJson?.take(100) ?: "NULL"}")
             Log.d(TAG, "============================================")
 
-            // Apply auth headers if provided
-            authHeadersJson?.let { json ->
-                if (json.isNotEmpty() && json != "{}") {
-                    try {
-                        val headersObj = JSONObject(json)
-                        val headers = mutableMapOf<String, String>()
-                        headersObj.keys().forEach { key ->
-                            headers[key] = headersObj.getString(key)
-                            Log.d(TAG, "🔐 Header: $key = ${headersObj.getString(key).take(20)}...")
-                        }
-                        setAuthHeaders(headers)
-                        Log.d(TAG, "🔐 Applied ${headers.size} auth headers")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "⚠️ Failed to parse auth headers JSON: $json", e)
-                    }
-                }
-            }
+            // Add Referer header for BunnyCDN hotlink protection
+            val headers = mutableMapOf<String, String>()
+            headers["Referer"] = "https://akkuott.com"
+            Log.d(TAG, "🔐 Added Referer header: https://akkuott.com")
+
+            setAuthHeaders(headers)
+            Log.d(TAG, "🔐 Applied ${headers.size} headers")
 
             // Save metadata - ensure manifestUrl is included for playback
             val finalMetadataJson = if (metadataJson != null) {
@@ -459,28 +449,76 @@ class OfflineHlsDownloadManager(
             val mediaItem = mediaItemBuilder.build()
             Log.d(TAG, "📋 MediaItem built successfully")
 
-            // Create RenderersFactory for proper track detection
-            Log.d(TAG, "🔧 Creating RenderersFactory...")
-            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
-                .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-
-            // Create download helper with RenderersFactory for proper track parsing
-            Log.d(TAG, "🔧 Creating DownloadHelper with RenderersFactory...")
-            Log.d(TAG, "   Using httpDataSourceFactory with headers: ${authHeaders.keys}")
-
-            val helper = DownloadHelper.forMediaItem(
-                context,
-                mediaItem,
-                renderersFactory, // ✅ Use RenderersFactory for proper track detection
-                httpDataSourceFactory
-            )
-
             // Send "preparing" event so UI shows progress immediately
             sendProgressEvent(contentId, "preparing", 0f)
             Log.d(TAG, "📡 Sent 'preparing' event to Flutter")
 
             // Start progress polling for more frequent UI updates
             startProgressPolling()
+
+            // ============================================
+            // DIRECT DOWNLOAD - Skip DownloadHelper.prepare()
+            // This avoids the "prepare" request that CDNs like BunnyCDN block
+            // The actual segment downloads will work like normal streaming
+            // ============================================
+            Log.d(TAG, "🚀 Using DIRECT download (skipping DownloadHelper.prepare)")
+            Log.d(TAG, "   This avoids CDN download protection that blocks prepare requests")
+
+            val directRequest = DownloadRequest.Builder(contentId, Uri.parse(manifestUrl))
+                .setMimeType(MimeTypes.APPLICATION_M3U8)
+                .setData(metadataJson?.toByteArray()) // Store metadata for later retrieval
+                .build()
+
+            Log.d(TAG, "📦 Direct DownloadRequest created:")
+            Log.d(TAG, "   ID: ${directRequest.id}")
+            Log.d(TAG, "   URI: ${directRequest.uri}")
+            Log.d(TAG, "   MIME: ${directRequest.mimeType}")
+
+            // Start download via foreground service
+            DownloadService.sendAddDownload(
+                context,
+                OfflineHlsDownloadService::class.java,
+                directRequest,
+                /* foreground= */ true
+            )
+
+            Log.d(TAG, "🚀 Direct download request sent to DownloadService!")
+            Log.d(TAG, "✅ Download will proceed segment-by-segment like streaming")
+
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ startDownload FAILED", e)
+            sendProgressEvent(contentId, "failed", 0f)
+            false
+        }
+    }
+
+    // Old DownloadHelper approach - kept for reference but not used
+    private fun startDownloadWithHelper_DISABLED(
+        contentId: String,
+        manifestUrl: String,
+        title: String,
+        quality: String,
+        licenseUrl: String?,
+        metadataJson: String?
+    ) {
+        try {
+            val mediaItemBuilder = MediaItem.Builder()
+                .setUri(manifestUrl)
+                .setMimeType(MimeTypes.APPLICATION_M3U8)
+                .setMediaId(contentId)
+
+            val mediaItem = mediaItemBuilder.build()
+
+            val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
+                .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
+            val helper = DownloadHelper.forMediaItem(
+                context,
+                mediaItem,
+                renderersFactory,
+                httpDataSourceFactory
+            )
 
             helper.prepare(object : DownloadHelper.Callback {
                 override fun onPrepared(helper: DownloadHelper) {
