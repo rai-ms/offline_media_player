@@ -376,13 +376,23 @@ class OfflineHlsDownloadManager(
             Log.d(TAG, "   AuthHeadersJson: ${authHeadersJson?.take(100) ?: "NULL"}")
             Log.d(TAG, "============================================")
 
-            // Add Referer header for BunnyCDN hotlink protection
-            val headers = mutableMapOf<String, String>()
-            headers["Referer"] = "https://akkuott.com"
-            Log.d(TAG, "🔐 Added Referer header: https://akkuott.com")
-
-            setAuthHeaders(headers)
-            Log.d(TAG, "🔐 Applied ${headers.size} headers")
+            // Apply headers from Flutter (includes Referer for CDN hotlink protection)
+            authHeadersJson?.let { json ->
+                if (json.isNotEmpty() && json != "{}") {
+                    try {
+                        val headersObj = JSONObject(json)
+                        val headers = mutableMapOf<String, String>()
+                        headersObj.keys().forEach { key ->
+                            headers[key] = headersObj.getString(key)
+                            Log.d(TAG, "🔐 Header: $key = ${headersObj.getString(key).take(30)}...")
+                        }
+                        setAuthHeaders(headers)
+                        Log.d(TAG, "🔐 Applied ${headers.size} headers from Flutter")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "⚠️ Failed to parse headers JSON: $json", e)
+                    }
+                }
+            }
 
             // Save metadata - ensure manifestUrl is included for playback
             val finalMetadataJson = if (metadataJson != null) {
