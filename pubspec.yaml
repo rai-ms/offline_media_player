@@ -1,0 +1,28 @@
+name: offline_media_player
+description: "A Flutter plugin for offline HLS/DASH video downloads with DRM support (Widevine/FairPlay). Download, manage, and play streaming content offline on Android & iOS."
+version: 1.0.0
+homepage: https://github.com/rai-ms/offline_media_player
+repository: https://github.com/rai-ms/offline_media_player
+issue_tracker: https://github.com/rai-ms/offline_media_player/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.raims.offline_media_player
+        pluginClass: OfflineMediaPlayerPlugin
+      ios:
+        pluginClass: OfflineMediaPlayerPlugin
