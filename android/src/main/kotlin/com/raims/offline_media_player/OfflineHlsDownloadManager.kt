@@ -505,7 +505,7 @@ class OfflineHlsDownloadManager(
             startProgressPolling()
 
             helper.prepare(object : DownloadHelper.Callback {
-                override fun onPrepared(helper: DownloadHelper, unused: Boolean) {
+                override fun onPrepared(helper: DownloadHelper) {
                     Log.d(TAG, "✅ DownloadHelper prepared!")
                     Log.d(TAG, "   Period count: ${helper.periodCount}")
 
@@ -846,6 +846,46 @@ class OfflineHlsDownloadManager(
         return isComplete
     }
 
+    fun cancelDownload(contentId: String): Boolean {
+        return try {
+            Log.d(TAG, "❌ Cancelling download: $contentId")
+            DownloadService.sendRemoveDownload(
+                context,
+                OfflineHlsDownloadService::class.java,
+                contentId,
+                /* foreground= */ false
+            )
+            // Remove metadata and license
+            metadataPrefs.edit().remove(contentId).apply()
+            licensePrefs.edit().remove(contentId).apply()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Cancel failed", e)
+            false
+        }
+    }
+
+    fun getDownloadState(contentId: String): String? {
+        val download = downloadManager.downloadIndex.getDownload(contentId) ?: return null
+        val metadataJson = metadataPrefs.getString(contentId, null)
+        return try {
+            val result = JSONObject()
+            result.put("contentId", contentId)
+            result.put("state", downloadStateToInt(download.state))
+            result.put("progress", download.percentDownloaded / 100.0)
+            result.put("downloadedBytes", download.bytesDownloaded)
+            result.put("totalBytes", download.contentLength)
+            if (metadataJson != null) {
+                val metadata = JSONObject(metadataJson)
+                result.put("metadata", metadata)
+            }
+            result.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting download state", e)
+            null
+        }
+    }
+
     fun getDownloadProgress(contentId: String): Float {
         val download = downloadManager.downloadIndex.getDownload(contentId)
         return download?.percentDownloaded ?: 0f
@@ -877,6 +917,9 @@ class OfflineHlsDownloadManager(
         cursor.close()
         return downloads.toString()
     }
+
+    // Alias for backward compatibility
+    fun getAllDownloadsJson(): String = getAllDownloads()
 
     private fun downloadStateToInt(state: Int): Int {
         return when (state) {

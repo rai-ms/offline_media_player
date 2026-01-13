@@ -179,12 +179,16 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
             return
         }
 
-        // Initialize download manager
-        downloadManager = OfflineHlsDownloadManager.getInstance(ctx).apply {
-            initialize(userId) { event ->
+        // Create new download manager instance with userId and progress callback
+        downloadManager = OfflineHlsDownloadManager(
+            context = ctx,
+            userId = userId,
+            progressCallback = { event ->
                 sendProgressEvent(event)
             }
-        }
+        )
+        // Set as singleton for shared access
+        OfflineHlsDownloadManager.setInstance(downloadManager!!)
 
         // Initialize player manager
         playerManager = OfflineHlsPlayerManager(ctx, downloadManager!!) { event ->
@@ -203,8 +207,8 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
         val title = call.argument<String>("title") ?: ""
         val quality = call.argument<String>("quality") ?: "720p"
         val licenseUrl = call.argument<String>("licenseUrl")
-        val drmHeaders = call.argument<String>("drmHeaders")
-        val authHeaders = call.argument<String>("authHeaders")
+        val drmHeadersJson = call.argument<String>("drmHeaders")
+        val authHeadersJson = call.argument<String>("authHeaders")
         val metadataJson = call.argument<String>("metadata")
 
         if (contentId.isEmpty() || manifestUrl.isEmpty()) {
@@ -218,9 +222,9 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
             title = title,
             quality = quality,
             licenseUrl = licenseUrl,
-            drmHeaders = drmHeaders,
-            authHeaders = authHeaders,
-            metadataJson = metadataJson
+            drmHeadersJson = drmHeadersJson,
+            metadataJson = metadataJson,
+            authHeadersJson = authHeadersJson
         ) ?: false
 
         result.success(success)
