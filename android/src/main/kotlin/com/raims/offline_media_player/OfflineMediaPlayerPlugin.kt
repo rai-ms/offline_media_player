@@ -154,6 +154,7 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
             // Playback operations
             "playOffline" -> handlePlayOffline(call, result)
             "launchNativePlayer" -> handleLaunchNativePlayer(call, result)
+            "launchOfflinePlayer" -> handleLaunchNativePlayer(call, result) // Alias for Flutter
             "pausePlayback" -> handlePausePlayback(result)
             "resumePlayback" -> handleResumePlayback(result)
             "stopPlayback" -> handleStopPlayback(result)
