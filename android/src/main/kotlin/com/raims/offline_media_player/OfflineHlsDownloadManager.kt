@@ -378,12 +378,13 @@ class OfflineHlsDownloadManager(
 
             // Check if URL is a direct S3/CDN URL that doesn't need auth headers
             // AWS S3 returns 400 when receiving non-AWS Authorization headers
-            val isDirectStorageUrl = manifestUrl.contains(".s3.") ||
+            // NOTE: BunnyCDN (b-cdn.net) DOES require auth headers, so exclude it
+            val isDirectStorageUrl = (manifestUrl.contains(".s3.") ||
                     manifestUrl.contains(".s3-") ||
                     manifestUrl.contains("cloudfront.net") ||
-                    manifestUrl.contains("cdn.") ||
                     manifestUrl.contains(".amazonaws.com") ||
-                    manifestUrl.contains("storage.googleapis.com")
+                    manifestUrl.contains("storage.googleapis.com")) &&
+                    !manifestUrl.contains("b-cdn.net") // BunnyCDN requires auth
 
             if (isDirectStorageUrl) {
                 Log.d(TAG, "🌐 Direct storage URL detected - skipping auth headers")
