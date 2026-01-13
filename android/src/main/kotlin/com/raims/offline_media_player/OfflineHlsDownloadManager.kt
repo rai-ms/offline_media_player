@@ -376,43 +376,20 @@ class OfflineHlsDownloadManager(
             Log.d(TAG, "   AuthHeadersJson: ${authHeadersJson?.take(100) ?: "NULL"}")
             Log.d(TAG, "============================================")
 
-            // Check if URL is a direct S3/CDN URL that doesn't need auth headers
-            // AWS S3 returns 400 when receiving non-AWS Authorization headers
-            // NOTE: BunnyCDN (b-cdn.net) DOES require auth headers, so exclude it
-            val isDirectStorageUrl = (manifestUrl.contains(".s3.") ||
-                    manifestUrl.contains(".s3-") ||
-                    manifestUrl.contains("cloudfront.net") ||
-                    manifestUrl.contains(".amazonaws.com") ||
-                    manifestUrl.contains("storage.googleapis.com")) &&
-                    !manifestUrl.contains("b-cdn.net") // BunnyCDN requires auth
-
-            if (isDirectStorageUrl) {
-                Log.d(TAG, "🌐 Direct storage URL detected - skipping auth headers")
-                Log.d(TAG, "   AWS S3 returns 400 if sent non-AWS Authorization headers")
-                // Clear any previously set auth headers
-                httpDataSourceFactory.setDefaultRequestProperties(emptyMap())
-            } else {
-                // Parse and apply auth headers for proxy/API URLs
-                if (authHeadersJson.isNullOrEmpty() || authHeadersJson == "{}") {
-                    Log.w(TAG, "⚠️ NO AUTH HEADERS PROVIDED for non-S3 URL!")
-                }
-
-                authHeadersJson?.let { json ->
-                    if (json.isNotEmpty() && json != "{}") {
-                        try {
-                            val headersObj = JSONObject(json)
-                            val headers = mutableMapOf<String, String>()
-                            headersObj.keys().forEach { key ->
-                                headers[key] = headersObj.getString(key)
-                                Log.d(TAG, "🔐 Header: $key = ${headersObj.getString(key).take(20)}...")
-                            }
-                            setAuthHeaders(headers)
-                            Log.d(TAG, "🔐 Applied ${headers.size} auth headers")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "⚠️ Failed to parse auth headers JSON: $json", e)
+            // Apply auth headers if provided
+            authHeadersJson?.let { json ->
+                if (json.isNotEmpty() && json != "{}") {
+                    try {
+                        val headersObj = JSONObject(json)
+                        val headers = mutableMapOf<String, String>()
+                        headersObj.keys().forEach { key ->
+                            headers[key] = headersObj.getString(key)
+                            Log.d(TAG, "🔐 Header: $key = ${headersObj.getString(key).take(20)}...")
                         }
-                    } else {
-                        Log.w(TAG, "⚠️ Auth headers JSON is empty or {}")
+                        setAuthHeaders(headers)
+                        Log.d(TAG, "🔐 Applied ${headers.size} auth headers")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "⚠️ Failed to parse auth headers JSON: $json", e)
                     }
                 }
             }
