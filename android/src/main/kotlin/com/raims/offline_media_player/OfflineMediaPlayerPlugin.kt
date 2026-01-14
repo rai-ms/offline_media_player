@@ -64,10 +64,14 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
         progressChannel = EventChannel(flutterPluginBinding.binaryMessenger, PROGRESS_CHANNEL)
         progressChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                Log.d(TAG, "📡 PROGRESS EventChannel onListen - Flutter is now listening!")
+                Log.d(TAG, "   progressSink was: ${if (progressSink == null) "NULL" else "SET"}")
                 progressSink = events
+                Log.d(TAG, "   progressSink now: ${if (progressSink == null) "NULL" else "SET"}")
             }
 
             override fun onCancel(arguments: Any?) {
+                Log.d(TAG, "📡 PROGRESS EventChannel onCancel - Flutter stopped listening")
                 progressSink = null
             }
         })
@@ -406,8 +410,25 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
     // MARK: - Event Sending
 
     private fun sendProgressEvent(event: Map<String, Any?>) {
+        val contentId = event["contentId"]
+        val type = event["type"]
+        val progress = event["progress"]
+
+        Log.d(TAG, "📤 sendProgressEvent:")
+        Log.d(TAG, "   contentId: $contentId")
+        Log.d(TAG, "   type: $type")
+        Log.d(TAG, "   progress: $progress")
+        Log.d(TAG, "   progressSink: ${if (progressSink == null) "❌ NULL - EVENT WILL BE LOST!" else "✅ SET"}")
+        Log.d(TAG, "   activity: ${if (activity == null) "❌ NULL" else "✅ SET"}")
+
+        if (progressSink == null) {
+            Log.e(TAG, "⚠️ WARNING: progressSink is NULL! Event will NOT be delivered to Flutter!")
+        }
+
         activity?.runOnUiThread {
+            Log.d(TAG, "📤 Sending event on UI thread...")
             progressSink?.success(event)
+            Log.d(TAG, "📤 Event sent (or dropped if sink was null)")
         }
     }
 
