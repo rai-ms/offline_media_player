@@ -1,8 +1,12 @@
 package com.raims.offline_media_player
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -26,6 +30,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import kotlin.math.absoluteValue
 
 /**
  * Offline HLS Download Manager - FIXED VERSION
@@ -86,6 +91,12 @@ class OfflineHlsDownloadManager(
     private val httpDataSourceFactory: DefaultHttpDataSource.Factory
     private val downloadManager: DownloadManager
     private val downloadExecutor: Executor = Executors.newFixedThreadPool(MAX_PARALLEL_DOWNLOADS)
+
+    // Notification manager for per-download notifications
+    private val notificationManager: NotificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val individualNotificationChannel = "akku_ott_download_progress"
+    private val individualNotificationBaseId = 2000 // Base ID for individual download notifications
 
     // Progress polling for more frequent UI updates
     private val progressPollingHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -169,7 +180,122 @@ class OfflineHlsDownloadManager(
         OfflineHlsDownloadService.setDownloadManager(downloadManager)
         OfflineHlsDownloadService.initNotificationHelper(context)
 
+        // Create notification channel for individual download progress
+        createIndividualNotificationChannel()
+
         Log.d(TAG, "✅ OfflineHlsDownloadManager initialized successfully")
+    }
+
+    /**
+     * Create notification channel for individual download progress notifications
+     */
+    private fun createIndividualNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                individualNotificationChannel,
+                "Download Progress",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows progress for each individual download"
+                setShowBadge(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            notificationManager.createNotificationChannel(channel)
+            Log.d(TAG, "📢 Created individual download notification channel")
+        }
+    }
+
+    /**
+     * Generate unique notification ID for a content
+     */
+    private fun getNotificationIdForContent(contentId: String): Int {
+        return individualNotificationBaseId + contentId.hashCode().absoluteValue % 1000
+    }
+
+    /**
+     * Show or update individual download notification
+     */
+    private fun showIndividualDownloadNotification(
+        contentId: String,
+        title: String,
+        progress: Int,
+        state: String
+    ) {
+        val notificationId = getNotificationIdForContent(contentId)
+
+        val notificationBuilder = NotificationCompat.Builder(context, individualNotificationChannel)
+            .setSmallIcon(R.drawable.ic_download)
+            .setContentTitle(title)
+            .setOngoing(state == "downloading" || state == "queued")
+            .setAutoCancel(state == "completed" || state == "failed")
+            .setSilent(true)
+
+        when (state) {
+            "queued" -> {
+                notificationBuilder
+                    .setContentText("Waiting to start...")
+                    .setProgress(100, 0, true)
+            }
+            "downloading" -> {
+                notificationBuilder
+                    .setContentText("Downloading: $progress%")
+                    .setProgress(100, progress, false)
+            }
+            "completed" -> {
+                notificationBuilder
+                    .setContentText("Download complete")
+                    .setProgress(0, 0, false)
+            }
+            "failed" -> {
+                notificationBuilder
+                    .setContentText("Download failed")
+                    .setProgress(0, 0, false)
+            }
+            "paused" -> {
+                notificationBuilder
+                    .setContentText("Paused: $progress%")
+                    .setProgress(100, progress, false)
+            }
+        }
+
+        notificationManager.notify(notificationId, notificationBuilder.build())
+        Log.d(TAG, "📢 Notification updated: $contentId, state=$state, progress=$progress%")
+    }
+
+    /**
+     * Cancel individual download notification
+     */
+    private fun cancelIndividualDownloadNotification(contentId: String) {
+        val notificationId = getNotificationIdForContent(contentId)
+        notificationManager.cancel(notificationId)
+        Log.d(TAG, "📢 Notification cancelled: $contentId")
+    }
+
+    /**
+     * Get title for notification from metadata
+     */
+    private fun getTitleFromMetadata(contentId: String): String {
+        val metadataJson = metadataPrefs.getString(contentId, null)
+        if (metadataJson != null) {
+            try {
+                val metadata = JSONObject(metadataJson)
+                val title = metadata.optString("title", "")
+                if (title.isNotEmpty()) return title
+
+                // Fallback: try to construct from showName and episodeName
+                val showName = metadata.optString("showName", "")
+                val episodeName = metadata.optString("episodeName", "")
+                if (showName.isNotEmpty() && episodeName.isNotEmpty()) {
+                    return "$showName - $episodeName"
+                }
+                if (showName.isNotEmpty()) return showName
+                if (episodeName.isNotEmpty()) return episodeName
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing metadata for notification title", e)
+            }
+        }
+        return "Downloading..."
     }
 
     private fun createDownloadListener(): DownloadManager.Listener = object : DownloadManager.Listener {
@@ -193,14 +319,19 @@ class OfflineHlsDownloadManager(
                 Log.e(TAG, "❌ Download exception for $contentId:", finalException)
             }
 
+            // Get title for individual notification
+            val title = getTitleFromMetadata(contentId)
+
             when (download.state) {
                 Download.STATE_QUEUED -> {
                     Log.d(TAG, "⏳ Download queued: $contentId")
+                    showIndividualDownloadNotification(contentId, title, 0, "queued")
                     sendProgressEvent(contentId, "queued", 0f)
                 }
                 Download.STATE_DOWNLOADING -> {
                     val progressPercent = progress / 100f
                     Log.d(TAG, "⬇️ Downloading: $contentId - $progress%")
+                    showIndividualDownloadNotification(contentId, title, progress.toInt(), "downloading")
                     sendProgressEvent(
                         contentId,
                         "progress",
@@ -213,6 +344,12 @@ class OfflineHlsDownloadManager(
                     Log.d(TAG, "✅ Download COMPLETED: $contentId")
                     Log.d(TAG, "   Final size: ${download.bytesDownloaded} bytes")
                     updateMetadataState(contentId, 4)
+                    // Show completion notification briefly, then cancel
+                    showIndividualDownloadNotification(contentId, title, 100, "completed")
+                    // Cancel after 3 seconds
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        cancelIndividualDownloadNotification(contentId)
+                    }, 3000)
                     // Pass actual downloaded bytes for file size tracking
                     sendProgressEvent(
                         contentId,
@@ -225,18 +362,26 @@ class OfflineHlsDownloadManager(
                 Download.STATE_FAILED -> {
                     Log.e(TAG, "❌ Download FAILED: $contentId")
                     updateMetadataState(contentId, 5)
+                    showIndividualDownloadNotification(contentId, title, 0, "failed")
+                    // Cancel after 5 seconds
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        cancelIndividualDownloadNotification(contentId)
+                    }, 5000)
                     sendProgressEvent(contentId, "failed", 0f)
                 }
                 Download.STATE_STOPPED -> {
                     Log.d(TAG, "⏸️ Download paused: $contentId")
                     updateMetadataState(contentId, 3)
+                    showIndividualDownloadNotification(contentId, title, progress.toInt(), "paused")
                     sendProgressEvent(contentId, "paused", progress / 100f)
                 }
                 Download.STATE_REMOVING -> {
                     Log.d(TAG, "🗑️ Removing download: $contentId")
+                    cancelIndividualDownloadNotification(contentId)
                 }
                 Download.STATE_RESTARTING -> {
                     Log.d(TAG, "🔄 Restarting download: $contentId")
+                    showIndividualDownloadNotification(contentId, title, progress.toInt(), "downloading")
                     sendProgressEvent(contentId, "resumed", progress / 100f)
                 }
             }
@@ -244,6 +389,7 @@ class OfflineHlsDownloadManager(
 
         override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
             Log.d(TAG, "🗑️ Download removed: ${download.request.id}")
+            cancelIndividualDownloadNotification(download.request.id)
         }
     }
 
