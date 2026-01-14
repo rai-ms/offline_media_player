@@ -50,7 +50,7 @@ class OfflineHlsDownloadManager(
 ) {
 
     companion object {
-        private const val TAG = "OfflineHlsDownloadMgr"
+        private const val TAG = "🔔OfflineHlsDownloadMgr"
         private const val DOWNLOAD_DIR = "offline_hls"
         private const val METADATA_PREFS = "offline_hls_metadata"
         private const val LICENSE_PREFS = "offline_hls_licenses"
@@ -524,6 +524,11 @@ class OfflineHlsDownloadManager(
             Log.d(TAG, "   MIME: ${directRequest.mimeType}")
 
             // Start download via foreground service
+            Log.d(TAG, "📤 SENDING TO DownloadService.sendAddDownload()...")
+            Log.d(TAG, "   contentId: $contentId")
+            Log.d(TAG, "   foreground: true")
+            Log.d(TAG, "   ⚠️ This will trigger DownloadService to create/update foreground notification")
+
             DownloadService.sendAddDownload(
                 context,
                 OfflineHlsDownloadService::class.java,
@@ -531,7 +536,7 @@ class OfflineHlsDownloadManager(
                 /* foreground= */ true
             )
 
-            Log.d(TAG, "🚀 Direct download request sent to DownloadService!")
+            Log.d(TAG, "🚀 DownloadService.sendAddDownload() COMPLETED")
             Log.d(TAG, "✅ Download will proceed segment-by-segment like streaming")
 
             true

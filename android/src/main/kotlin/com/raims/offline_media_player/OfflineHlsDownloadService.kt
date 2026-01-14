@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
@@ -37,7 +38,7 @@ class OfflineHlsDownloadService : DownloadService(
 ) {
 
     companion object {
-        private const val TAG = "OfflineHlsDownloadSvc"
+        private const val TAG = "🔔OfflineHlsDownloadSvc"
         private const val CHANNEL_ID = "akku_ott_downloads"
         private const val FOREGROUND_NOTIFICATION_ID = 1001
         private const val JOB_ID = 1002
@@ -81,7 +82,13 @@ class OfflineHlsDownloadService : DownloadService(
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(TAG, "🚀 OfflineHlsDownloadService onCreate()")
         initNotificationHelper(this)
+    }
+
+    override fun onDestroy() {
+        Log.d(TAG, "🛑 OfflineHlsDownloadService onDestroy()")
+        super.onDestroy()
     }
 
     override fun getDownloadManager(): DownloadManager {
@@ -101,12 +108,22 @@ class OfflineHlsDownloadService : DownloadService(
         downloads: MutableList<Download>,
         notMetRequirements: Int
     ): Notification {
+        Log.d(TAG, "📢 getForegroundNotification called:")
+        Log.d(TAG, "   downloads.size = ${downloads.size}")
+        Log.d(TAG, "   notMetRequirements = $notMetRequirements")
+        Log.d(TAG, "   FOREGROUND_NOTIFICATION_ID = $FOREGROUND_NOTIFICATION_ID")
+
+        for (download in downloads) {
+            Log.d(TAG, "   📥 Download: id=${download.request.id}, state=${download.state}, progress=${download.percentDownloaded}%")
+        }
+
         val helper = notificationHelper ?: run {
+            Log.d(TAG, "   ⚠️ notificationHelper was null, initializing...")
             initNotificationHelper(this)
             notificationHelper!!
         }
 
-        return helper.buildProgressNotification(
+        val notification = helper.buildProgressNotification(
             this,
             R.drawable.ic_download,
             null, // No pending intent - user can open app from notification
@@ -114,5 +131,8 @@ class OfflineHlsDownloadService : DownloadService(
             downloads,
             notMetRequirements
         )
+
+        Log.d(TAG, "📢 Built notification: channelId=${notification.channelId}")
+        return notification
     }
 }
