@@ -120,8 +120,11 @@ class OfflineHlsDownloadManager(
     // Progress polling for more frequent UI updates
     private val progressPollingHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var isPollingActive = false
+    private var pollCount = 0 // Track poll iterations to avoid stopping too early
+    private val MIN_POLL_COUNT = 5 // Minimum polls before allowing auto-stop
     private val progressPollingRunnable = object : Runnable {
         override fun run() {
+            pollCount++
             pollDownloadProgress()
             if (isPollingActive) {
                 progressPollingHandler.postDelayed(this, 1000) // Poll every 1 second
@@ -323,8 +326,10 @@ class OfflineHlsDownloadManager(
     private fun startProgressPolling() {
         if (!isPollingActive) {
             isPollingActive = true
-            progressPollingHandler.post(progressPollingRunnable)
-            Log.d(TAG, "📊 Started progress polling")
+            pollCount = 0 // Reset poll count
+            // Delay first poll by 500ms to give download time to be registered
+            progressPollingHandler.postDelayed(progressPollingRunnable, 500)
+            Log.d(TAG, "📊 Started progress polling (with 500ms initial delay)")
         }
     }
 
@@ -346,6 +351,8 @@ class OfflineHlsDownloadManager(
             val currentDownloads = downloadManager.currentDownloads
             var hasActiveDownloads = false
 
+            Log.d(TAG, "📊 pollDownloadProgress: pollCount=$pollCount, currentDownloads.size=${currentDownloads.size}")
+
             for (download in currentDownloads) {
                 when (download.state) {
                     Download.STATE_DOWNLOADING -> {
@@ -365,13 +372,21 @@ class OfflineHlsDownloadManager(
                     }
                     Download.STATE_QUEUED -> {
                         hasActiveDownloads = true
+                        Log.d(TAG, "📊 Download queued, keeping polling active")
+                    }
+                    Download.STATE_RESTARTING -> {
+                        hasActiveDownloads = true
                     }
                 }
             }
 
-            // Stop polling if no active downloads
-            if (!hasActiveDownloads && isPollingActive) {
+            // Stop polling if no active downloads AND we've polled at least MIN_POLL_COUNT times
+            // This prevents stopping too early when download is just starting
+            if (!hasActiveDownloads && isPollingActive && pollCount >= MIN_POLL_COUNT) {
+                Log.d(TAG, "📊 No active downloads after $pollCount polls, stopping")
                 stopProgressPolling()
+            } else if (!hasActiveDownloads && pollCount < MIN_POLL_COUNT) {
+                Log.d(TAG, "📊 No active downloads but only $pollCount polls (min=$MIN_POLL_COUNT), continuing...")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error polling download progress", e)
