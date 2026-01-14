@@ -38,8 +38,6 @@
 ///   title: 'Movie Title',
 /// );
 /// ```
-///
-/// @author Shubham Rai (rai-ms)
 library offline_media_player;
 
 import 'dart:async';

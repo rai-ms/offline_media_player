@@ -28,10 +28,13 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  offline_media_player:
-    git:
-      url: https://github.com/rai-ms/offline_media_player.git
-      ref: main
+  offline_media_player: ^1.0.0
+```
+
+Then run:
+
+```bash
+flutter pub get
 ```
 
 ## Usage
@@ -217,7 +220,7 @@ Add to your `Info.plist`:
 
 ## Author
 
-**Shubham Rai** ([@rai-ms](https://github.com/rai-ms))
+**Ashish Rai** ([@rai-ms](https://github.com/rai-ms))
 
 ## License
 

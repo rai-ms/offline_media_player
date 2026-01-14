@@ -24,8 +24,6 @@ import io.flutter.plugin.common.MethodChannel.Result
  * - Widevine DRM for protected content
  * - Background downloads with notifications
  * - Offline playback with native player
- *
- * @author Shubham Rai (rai-ms)
  */
 @OptIn(UnstableApi::class)
 class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
