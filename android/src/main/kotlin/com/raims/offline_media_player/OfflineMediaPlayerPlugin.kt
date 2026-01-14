@@ -190,6 +190,8 @@ class OfflineMediaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
         )
         // Set as singleton for shared access
         OfflineHlsDownloadManager.setInstance(downloadManager!!)
+        // Store userId for persistence across process restarts (critical for playback after app kill)
+        OfflineHlsDownloadManager.storeUserId(ctx, userId)
 
         // Initialize player manager
         playerManager = OfflineHlsPlayerManager(ctx, downloadManager!!) { event ->
