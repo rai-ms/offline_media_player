@@ -48,8 +48,8 @@ android {
     }
 
     dependencies {
-        // Flutter
-        implementation("io.flutter:flutter_embedding_debug:1.0.0-b0054fcec2eaa9f2cebc4e7adcd2e99e2f39a64f")
+        // Note: Flutter embedding is automatically provided by the Flutter build system
+        // Do NOT add any io.flutter:flutter_embedding dependency here
 
         // Media3 (ExoPlayer successor) for HLS downloads and playback
         def media3Version = "1.2.1"

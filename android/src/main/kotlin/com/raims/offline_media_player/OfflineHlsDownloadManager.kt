@@ -903,6 +903,10 @@ class OfflineHlsDownloadManager(
                 /* stopReason= */ Download.STOP_REASON_NONE,
                 /* foreground= */ true
             )
+            // Restart progress polling for UI updates
+            // Polling stops when download is paused (no active downloads)
+            // so we need to restart it when resuming
+            startProgressPolling()
             true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Resume failed", e)
