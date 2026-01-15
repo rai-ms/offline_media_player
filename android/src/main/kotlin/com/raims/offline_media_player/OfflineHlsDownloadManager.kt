@@ -448,7 +448,7 @@ class OfflineHlsDownloadManager(
                 }
             }
 
-            // Save metadata - ensure manifestUrl is included for playback
+            // Save metadata - ensure manifestUrl and title are included
             val finalMetadataJson = if (metadataJson != null) {
                 try {
                     val metadataObj = JSONObject(metadataJson)
@@ -456,9 +456,12 @@ class OfflineHlsDownloadManager(
                     if (!metadataObj.has("manifestUrl")) {
                         metadataObj.put("manifestUrl", manifestUrl)
                     }
+                    // Always set title from the passed parameter (for notifications)
+                    metadataObj.put("title", title)
+                    metadataObj.put("quality", quality)
                     metadataObj.toString()
                 } catch (e: Exception) {
-                    Log.e(TAG, "⚠️ Failed to add manifestUrl to metadata", e)
+                    Log.e(TAG, "⚠️ Failed to add manifestUrl/title to metadata", e)
                     metadataJson
                 }
             } else {
@@ -470,9 +473,11 @@ class OfflineHlsDownloadManager(
                     put("quality", quality)
                 }.toString()
             }
+            Log.d(TAG, "💾 Saving metadata with title='$title' for: $contentId")
 
-            metadataPrefs.edit().putString(contentId, finalMetadataJson).apply()
-            Log.d(TAG, "💾 Saved metadata for: $contentId (with manifestUrl)")
+            // Use commit() for synchronous write - ensures metadata is available for notification
+            metadataPrefs.edit().putString(contentId, finalMetadataJson).commit()
+            Log.d(TAG, "💾 Saved metadata for: $contentId (title=$title)")
 
             // Build MediaItem with CORRECT MIME TYPE
             val mediaItemBuilder = MediaItem.Builder()
