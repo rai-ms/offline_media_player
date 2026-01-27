@@ -9,7 +9,7 @@ import Flutter
 /// - Play downloaded content via native AVPlayer
 ///
 /// Flutter NEVER touches HLS files directly - all file operations are native only.
-class OfflineMediaPlayerPlugin: NSObject, FlutterPlugin {
+@objc public class OfflineMediaPlayerPlugin: NSObject, FlutterPlugin {
 
     private let TAG = "OfflineHlsPlugin"
 
@@ -20,7 +20,7 @@ class OfflineMediaPlayerPlugin: NSObject, FlutterPlugin {
     private var progressSink: FlutterEventSink?
     private var playbackSink: FlutterEventSink?
 
-    static func register(with registrar: FlutterPluginRegistrar) {
+    @objc public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = OfflineMediaPlayerPlugin()
 
         // Method channel
@@ -90,7 +90,7 @@ class OfflineMediaPlayerPlugin: NSObject, FlutterPlugin {
 
     // MARK: - Method Call Handler
 
-    func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         NSLog("\(TAG): Method called: \(call.method)")
 
         switch call.method {
